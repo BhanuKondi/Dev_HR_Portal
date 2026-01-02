@@ -1,192 +1,193 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Payslip</title>
-
-<style>
-body {
-    font-family: sans-serif;
-    font-size: 13px;
-    color: #000;
-}
-
-table {
-    width: 100%;
-    border-collapse: collapse;
-}
-
-.main {
-    width: 900px;
-    margin: auto;
-    border: 1px solid #000;
-}
-
-td, th {
-    border: 1px solid #000;
-    padding: 6px;
-    vertical-align: top;
-}
-
-.company-name {
-    font-size: 20px;
-    font-weight: bold;
-}
-
-.section {
-    background-color: #f2f2f2;
-    font-weight: bold;
-    font-size: 15px;
-}
-
-.subheading {
-    font-weight: bold;
-    font-size: 14px;
-}
-
-.right {
-    text-align: right;
-}
-
-.center {
-    text-align: center;
-}
-
-.bold {
-    font-weight: bold;
-}
-
-.netpay {
-    background-color: #e6f4ea;
-    font-weight: bold;
-    font-size: 16px;
-}
-</style>
+    <meta charset="UTF-8">
+    <title>Payslip</title>
+ 
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+ 
+    <style>
+        body {
+            font-size: 14px;
+            color: #000;
+            background-color: #f8f9fa;
+        }
+ 
+        .payslip-container {
+            max-width: 900px;
+            margin: 30px auto;
+            background: #fff;
+            border: 1px solid #000;
+            padding: 20px;
+        }
+ 
+        .company-name {
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+ 
+        .section-title {
+            background: #f2f2f2;
+            font-weight: 600;
+            padding: 8px;
+            border: 1px solid #000;
+        }
+ 
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+ 
+        td, th {
+            border: 1px solid #000;
+            padding: 8px;
+            vertical-align: middle;
+        }
+ 
+        .text-right {
+            text-align: right;
+        }
+ 
+        .netpay {
+            background-color: #e6f4ea;
+            font-weight: bold;
+            font-size: 16px;
+            padding: 12px;
+            border: 1px solid #000;
+        }
+ 
+        .logo {
+            max-height: 70px;
+        }
+ 
+        @media print {
+            body {
+                background: none;
+            }
+            .border-bottom {
+                border-bottom: 1px solid #000 !important;
+            }
+        }
+    </style>
 </head>
-
+ 
 <body>
-
-<table class="main">
-
-    <!-- HEADER -->
-    <tr>
-        <td colspan="4">
+ 
+<div class="payslip-container">
+ 
+    <!-- ================= HEADER ================= -->
+    <div class="row align-items-center mb-4 border-bottom pb-3">
+ 
+        <!-- LOGO -->
+        <div class="col-md-2 col-3 text-start">
+            <img src="{{ url_for('static', filename='images/logo.png') }}"
+     class="img-fluid logo"
+     alt="Company Logo">
+        </div>
+ 
+        <!-- COMPANY DETAILS -->
+        <div class="col-md-7 col-9">
             <div class="company-name">ATIKES</div>
-            <div>
+            <div class="fw-semibold">
                 #4-36/1, Near Railway Station, Gopalapatnam,<br>
-                Andhra Pradesh 533408
+                Andhra Pradesh – 533408
             </div>
-        </td>
-    </tr>
-
-    <tr>
-        <td colspan="4" class="right bold" style="font-size:14px;">
-            Payslip for {{ pay_period }}
-        </td>
-    </tr>
-
-    <!-- EMPLOYEE SUMMARY -->
-    <tr class="section">
-        <td colspan="4">Employee Summary</td>
-    </tr>
-
-    <tr>
-        <td colspan="2" class="bold">Employee Name</td>
-        <td colspan="2">{{ employee_name }}</td>
-    </tr>
-
-    <tr>
-        <td colspan="2" class="bold">Employee ID</td>
-        <td colspan="2">{{ employee_id }}</td>
-    </tr>
-
-    <tr>
-        <td colspan="2" class="bold">Designation</td>
-        <td colspan="2">{{ designation }}</td>
-    </tr>
-
-    <tr>
-        <td colspan="2" class="bold">Date of Joining</td>
-        <td colspan="2">{{ date_of_joining }}</td>
-    </tr>
-
-    <tr>
-        <td colspan="2" class="bold">Pay Date</td>
-        <td colspan="2">{{ pay_date }}</td>
-    </tr>
-
-    <tr>
-        <td colspan="2" class="bold">Bank Account</td>
-        <td colspan="2">{{ bank_account }}</td>
-    </tr>
-
- <tr>
-        <td colspan="2" class="bold">Working days</td>
-        <td colspan="2">{{ total_working_days }}</td>
-    </tr>
-    <tr>
-        <td colspan="2" class="bold">Paid Days</td>
-        <td colspan="2">{{ paid_days }}</td>
-    </tr>
-<tr>
-        <td colspan="2" class="bold">Absent Days</td>
-        <td colspan="2">{{ absent_days }}</td>
-    </tr>
-    <tr>
-        <td colspan="2" class="bold">LOP Days</td>
-        <td colspan="2">{{ lop_days }}</td>
-    </tr>
-
-    <!-- EARNINGS & DEDUCTIONS -->
-    <tr class="section center">
-        <td colspan="2">Earnings</td>
-        <td colspan="2">Deductions</td>
-    </tr>
-
-    <tr class="subheading">
-        <td>Description</td>
-        <td class="right">Amount (Rs.)</td>
-        <td>Description</td>
-        <td class="right">Amount (Rs.)</td>
-    </tr>
-
-    <tr>
-        <td>Basic</td>
-        <td class="right">{{ basic }}</td>
-        <td>LWP Deduction</td>
-        <td class="right">{{ lwp_deduction }}</td>
-    </tr>
-
-    <tr>
-        <td>Fixed Allowance</td>
-        <td class="right">{{ fixed_allowance }}</td>
-        <td></td>
-        <td></td>
-    </tr>
-
-    <tr class="bold">
-        <td>Gross Earnings</td>
-        <td class="right">{{ gross_salary }}</td>
-        <td>Total Deductions</td>
-        <td class="right">{{ lwp_deduction }}</td>
-    </tr>
-
-    <!-- NET PAY -->
-    <tr class="netpay">
-        <td colspan="4">
-            Total Net Pay: Rs. {{ net_pay }}<br>
-            Amount in Words: {{ amount_in_words }}
-        </td>
-    </tr>
-
-    <!-- FOOTER -->
-    <tr>
-        <td colspan="4" class="center" style="font-size: 11px;">
-            -- This is a system-generated document --
-        </td>
-    </tr>
-
-</table>
-
+        </div>
+ 
+        <!-- PAY PERIOD -->
+        <div class="col-md-3 text-end fw-bold">
+            Payslip for<br>
+            {{ pay_period }}
+        </div>
+ 
+    </div>
+ 
+    <!-- ================= EMPLOYEE SUMMARY ================= -->
+    <div class="section-title mb-2">Employee Summary</div>
+ 
+    <table class="mb-4">
+        <tr>
+            <td class="fw-bold">Employee Name</td>
+            <td>{{ employee_name }}</td>
+            <td class="fw-bold">Employee ID</td>
+            <td>{{ employee_id }}</td>
+        </tr>
+        <tr>
+            <td class="fw-bold">Designation</td>
+            <td>{{ designation }}</td>
+            <td class="fw-bold">Date of Joining</td>
+            <td>{{ date_of_joining }}</td>
+        </tr>
+        <tr>
+            <td class="fw-bold">Pay Date</td>
+            <td>{{ pay_date }}</td>
+            <td class="fw-bold">Bank Account</td>
+            <td>{{ bank_account }}</td>
+        </tr>
+        <tr>
+            <td class="fw-bold">Working Days</td>
+            <td>{{ total_working_days }}</td>
+            <td class="fw-bold">Paid Days</td>
+            <td>{{ paid_days }}</td>
+        </tr>
+        <tr>
+            <td class="fw-bold">Absent Days</td>
+            <td>{{ absent_days }}</td>
+            <td class="fw-bold">LOP Days</td>
+            <td>{{ lop_days }}</td>
+        </tr>
+    </table>
+ 
+    <!-- ================= EARNINGS & DEDUCTIONS ================= -->
+    <div class="section-title mb-2 text-center">Earnings & Deductions</div>
+ 
+    <table class="mb-4">
+        <thead class="table-light">
+            <tr>
+                <th>Description</th>
+                <th class="text-right">Amount (₹)</th>
+                <th>Description</th>
+                <th class="text-right">Amount (₹)</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Basic</td>
+                <td class="text-right">{{ basic }}</td>
+                <td>LWP Deduction</td>
+                <td class="text-right">{{ lwp_deduction }}</td>
+            </tr>
+            <tr>
+                <td>Fixed Allowance</td>
+                <td class="text-right">{{ fixed_allowance }}</td>
+                <td></td>
+                <td></td>
+            </tr>
+            <tr class="fw-bold">
+                <td>Gross Earnings</td>
+                <td class="text-right">{{ gross_salary }}</td>
+                <td>Total Deductions</td>
+                <td class="text-right">{{ lwp_deduction }}</td>
+            </tr>
+        </tbody>
+    </table>
+ 
+    <!-- ================= NET PAY ================= -->
+    <div class="netpay">
+        Total Net Pay: ₹ {{ net_pay }} <br>
+        Amount in Words: {{ amount_in_words }}
+    </div>
+ 
+    <!-- ================= FOOTER ================= -->
+    <div class="text-center mt-3" style="font-size: 12px;">
+        -- This is a system-generated document --
+    </div>
+ 
+</div>
+ 
 </body>
 </html>
+ 
+ 

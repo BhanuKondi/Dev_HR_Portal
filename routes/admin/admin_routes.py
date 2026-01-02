@@ -58,6 +58,7 @@ def add_employee():
         user.set_password(request.form.get("password"))
         db.session.add(user)
         db.session.flush()
+        manager_id=request.form.get("manager_id")
  
         # ---------- EMPLOYEE ----------
         emp = Employee(
@@ -70,7 +71,8 @@ def add_employee():
             job_title=request.form.get("job_title"),
             date_of_joining=request.form.get("date_of_joining"),
             status="Active",
-            user_id=user.id
+            user_id=user.id,
+            manager_emp_id=int(manager_id) if manager_id else None
         )
         db.session.add(emp)
         db.session.flush()
@@ -132,6 +134,8 @@ def view_employee(id):
         "status": emp.status,  # ✅ FIXED
         "role_id": emp.user.role_id if emp.user else None,
         "role_name": emp.user.role.name if emp.user and emp.user.role else "",
+        "manager_id": emp.manager_emp_id,
+        "manager_name": f"{emp.manager.first_name} {emp.manager.last_name}" if emp.manager else "-",
  
         "salary": {
             "gross_salary": salary.gross_salary if salary else 0,
@@ -166,6 +170,8 @@ def edit_employee(id):
     emp.phone = request.form.get("phone")
     emp.department = request.form.get("department")
     emp.job_title = request.form.get("job_title")
+    manager_id = request.form.get("manager_emp_id")
+    emp.manager_emp_id = int(manager_id) if manager_id else None
  
     # 🔥 STATUS SYNC (MOST IMPORTANT PART)
     new_status = request.form.get("status")

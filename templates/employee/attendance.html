@@ -39,26 +39,25 @@
   <div class="card p-3 shadow-sm">
     <h5>Today's Transactions</h5>
  
-    <!-- FILTER SEARCH START -->
+    <!-- DATE FILTER -->
     <div class="d-flex gap-2 mb-3 align-items-center">
-      <label class="mb-0">From:</label>
+      <label class="mb-0 fw-semibold">From:</label>
       <input type="date" id="fromDate" class="form-control form-control-sm">
  
-      <label class="mb-0">To:</label>
+      <label class="mb-0 fw-semibold">To:</label>
       <input type="date" id="toDate" class="form-control form-control-sm">
  
-      <button id="filterBtn" class="btn btn-primary btn-sm">Filter</button>
+      <button id="rangeFilterBtn" class="btn btn-secondary btn-sm">Filter</button>
     </div>
-    <!-- FILTER SEARCH END -->
  
     <div class="table-responsive">
-      <table class="table table-sm table-striped" id="txnTable">
-        <thead>
+      <table class="table table-striped table-bordered table-sm" id="txnTable">
+        <thead class="table-light">
           <tr>
-            <th>#</th>
+            <th>Date</th>
             <th>Clock In</th>
             <th>Clock Out</th>
-            <th>Duration</th>
+            <th>Total Duration</th>
           </tr>
         </thead>
         <tbody></tbody>
@@ -76,13 +75,15 @@ let previousWorkedSeconds = 0;
 /* ---------------- DIGITAL CLOCK ---------------- */
 function updateDigitalClock() {
   const now = new Date();
-  document.getElementById("digitalClock").innerText = now.toLocaleTimeString("en-IN", { hour12: true });
-  document.getElementById("todayDate").innerText = now.toLocaleDateString("en-IN");
+  document.getElementById("digitalClock").innerText =
+    now.toLocaleTimeString("en-IN", { hour12: true });
+  document.getElementById("todayDate").innerText =
+    now.toLocaleDateString("en-IN");
 }
 setInterval(updateDigitalClock, 1000);
 updateDigitalClock();
  
-/* ---------------- CONTROL BUTTONS ---------------- */
+/* ---------------- BUTTON STATUS ---------------- */
 async function setButtonsFromStatus() {
   const res = await fetch("/attendance/status");
   const data = await res.json();
@@ -90,7 +91,7 @@ async function setButtonsFromStatus() {
   document.getElementById("clockOutBtn").disabled = !data.active;
 }
  
-/* ---------------- TIMER FUNCTIONS ---------------- */
+/* ---------------- TIMER ---------------- */
 function stopWorkTimer() {
   clearInterval(workTimerInterval);
   workTimerInterval = null;
@@ -114,54 +115,84 @@ function startWorkTimer(clockInISO) {
 }
  
 function formatHHMMSS(sec) {
+  sec = Number(sec) || 0;
   const h = String(Math.floor(sec / 3600)).padStart(2, "0");
   const m = String(Math.floor((sec % 3600) / 60)).padStart(2, "0");
   const s = String(sec % 60).padStart(2, "0");
   return `${h}:${m}:${s}`;
 }
  
-/* ---------------- SUMMARY ---------------- */
+/* ---------------- DURATION FORMAT ---------------- */
+function formatDurationDetail(sec) {
+  if (!Number.isFinite(Number(sec)) || sec <= 0) return "-";
+ 
+  sec = Number(sec);
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+ 
+  return `${h}h ${m}m ${s}s`;
+}
+ 
+/* ---------------- TODAY SUMMARY ---------------- */
 async function loadTodaySummary() {
   const res = await fetch("/attendance/today-summary");
   const data = await res.json();
  
-  previousWorkedSeconds = data.total_seconds || 0;
-  document.getElementById("totalWorkedTime").innerText = formatHHMMSS(previousWorkedSeconds);
+  previousWorkedSeconds = Number(data.total_seconds) || 0;
+  document.getElementById("totalWorkedTime").innerText =
+    formatHHMMSS(previousWorkedSeconds);
  
   const tbody = document.querySelector("#txnTable tbody");
   tbody.innerHTML = "";
  
+  if (!data.transactions || data.transactions.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="4" class="text-center text-muted">
+          No transactions today
+        </td>
+      </tr>`;
+    return;
+  }
+ 
   data.transactions.forEach(tx => {
+   let durationSeconds = Number(tx.duration_seconds);
+ 
+ 
+    // ✅ FIX: calculate live duration if clock_out is missing
+    if (!tx.clock_out && tx.clock_in) {
+      const start = new Date(tx.clock_in);
+      const now = new Date();
+      durationSeconds = Math.floor((now - start) / 1000);
+    }
+ 
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td>${tx.transaction_no}</td>
-      <td>${tx.clock_in}</td>
-      <td>${tx.clock_out}</td>
-      <td>${tx.duration === '-' ? '-' : formatDurationDetail(tx.duration)}</td>
+      <td>${new Date().toLocaleDateString("en-IN")}</td>
+      <td>${tx.clock_in || "-"}</td>
+      <td>${tx.clock_out || "-"}</td>
+      <td>${formatDurationDetail(durationSeconds)}</td>
     `;
     tbody.appendChild(tr);
   });
 }
  
-function formatDurationDetail(sec) {
-  const h = Math.floor(sec / 3600);
-  const m = Math.floor((sec % 3600) / 60);
-  const s = sec % 60;
-  return `${h}h ${m}m ${s}s`;
-}
  
-/* ---------------- CURRENT STATUS ---------------- */
+/* ---------------- CURRENT SESSION ---------------- */
 async function loadCurrentSession() {
   const res = await fetch("/attendance/current");
   const data = await res.json();
  
   if (data.active) {
     startWorkTimer(data.clock_in);
-    document.getElementById("statusMessage").innerText = "You are currently clocked in";
+    document.getElementById("statusMessage").innerText =
+      "You are currently clocked in";
   } else {
     stopWorkTimer();
     document.getElementById("sessionTime").innerText = "00:00:00";
-    document.getElementById("statusMessage").innerText = "You are currently clocked out";
+    document.getElementById("statusMessage").innerText =
+      "You are currently clocked out";
   }
 }
  
@@ -181,32 +212,49 @@ document.getElementById("clockOutBtn").addEventListener("click", async () => {
   await setButtonsFromStatus();
 });
  
-/* ---------------- FILTER BUTTON ---------------- */
-document.getElementById("filterBtn").addEventListener("click", async () => {
-  const from = document.getElementById("fromDate").value;
-  const to = document.getElementById("toDate").value;
+/* ---------------- DATE RANGE FILTER ---------------- */
+document.getElementById("rangeFilterBtn").addEventListener("click", async () => {
+  const fromDate = document.getElementById("fromDate").value;
+  const toDate = document.getElementById("toDate").value;
  
-  if (!from || !to) return alert("Please select both From and To dates");
+  if (!fromDate || !toDate) {
+    alert("Please select both From and To dates");
+    return;
+  }
  
-  const res = await fetch(`/attendance/filter?from=${from}&to=${to}`);
+  const res = await fetch(
+    `/employee/attendance/from-to?from=${fromDate}&to=${toDate}`
+  );
   const data = await res.json();
  
   const tbody = document.querySelector("#txnTable tbody");
   tbody.innerHTML = "";
  
-  data.transactions.forEach(tx => {
+  if (!data.days || data.days.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="4" class="text-center text-muted">
+          No attendance records found for selected range
+        </td>
+      </tr>`;
+    return;
+  }
+ 
+  data.days.forEach(day => {
+    const seconds = Number(day.total_seconds);
+ 
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td>${tx.transaction_no}</td>
-      <td>${tx.clock_in}</td>
-      <td>${tx.clock_out}</td>
-      <td>${tx.duration === '-' ? '-' : formatDurationDetail(tx.duration)}</td>
+      <td>${new Date(day.date).toLocaleDateString("en-IN")}</td>
+      <td>${day.clock_in || "-"}</td>
+      <td>${day.clock_out || "-"}</td>
+      <td>${Number.isFinite(seconds) ? formatDurationDetail(seconds) : "-"}</td>
     `;
     tbody.appendChild(tr);
   });
 });
  
-/* ---------------- INITIAL LOAD ---------------- */
+/* ---------------- INIT ---------------- */
 (async function init() {
   await loadTodaySummary();
   await loadCurrentSession();

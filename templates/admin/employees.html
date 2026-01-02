@@ -77,6 +77,18 @@
                     <option value="3">Employee</option>
                   </select>
                 </div>
+                <div class="col-md-6">
+  <label>Manager</label>
+  <select name="manager_id" class="form-control">
+    <option value="">-- Select Manager --</option>
+    {% for mgr in managers %}
+      <option value="{{ mgr.id }}">
+        {{ mgr.first_name }} {{ mgr.last_name }}
+      </option>
+    {% endfor %}
+  </select>
+</div>
+
                 <div class="col-md-6"><label>Temp Password</label><input name="password" class="form-control" required></div>
               </div>
               <div class="text-end mt-3">
@@ -246,6 +258,11 @@
               <div class="col-md-6"><label>Job Title</label><input class="form-control" id="viewJobTitle" readonly></div>
               <div class="col-md-6"><label>Date of Joining</label><input class="form-control" id="viewDateJoining" readonly></div>
               <div class="col-md-6"><label>Role</label><input class="form-control" id="viewRole" readonly></div>
+              <div class="col-md-6">
+  <label>Manager</label>
+  <input class="form-control" id="viewManager" readonly>
+</div>
+
             </div>
           </div>
 
@@ -390,6 +407,19 @@
                     <option value="3">Employee</option>
                   </select>
                 </div>
+                <div class="col-md-6">
+  <label>Manager</label>
+ <select name="manager_emp_id" id="editManagerId" class="form-control">
+
+    <option value="">-- Select Manager --</option>
+    {% for mgr in managers %}
+      <option value="{{ mgr.id }}">
+        {{ mgr.first_name }} {{ mgr.last_name }}
+      </option>
+    {% endfor %}
+  </select>
+</div>
+
                 <div class="col-md-6">
   <label>Status</label>
   <select name="status" id="editStatus" class="form-control">
@@ -631,6 +661,8 @@ function openEditEmployee(empId) {
             editDateJoining.value  = emp.date_of_joining;
             editRoleId.value       = emp.role_id;
             editStatus.value       = emp.status || 'Active';
+            editManagerId.value    = emp.manager_id || "";  // ✅ Add this line
+
 
             /* Salary */
             editAnnualCTC.value = emp.salary?.gross_salary || 0;
@@ -676,6 +708,8 @@ function openViewEmployee(empId) {
             viewJobTitle.value    = emp.job_title || '';
             viewDateJoining.value = emp.date_of_joining;
             viewRole.value        = emp.role_name;
+            viewManager.value     = emp.manager_name || '-';  // ✅ Add here
+
 
             const ctc = emp.salary?.gross_salary || 0;
             viewCTC.value = ctc;

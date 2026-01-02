@@ -1,5 +1,5 @@
 {% extends "admin/admin_base.html" %}
-
+ 
 {% block content %}
 <div class="container mt-4">
   <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap">
@@ -9,7 +9,7 @@
       <div class="small text-muted" id="todayDate"></div>
     </div>
   </div>
-
+ 
   <!-- Attendance Controls and Timers -->
   <div class="card shadow p-4 mb-3">
     <div class="row align-items-center">
@@ -30,51 +30,65 @@
       <div class="col-12 text-center text-info" id="statusMessage"></div>
     </div>
   </div>
-
+ 
   <!-- Transactions Table -->
   <div class="card p-3 shadow-sm mb-3">
     <h5>Today's Transactions</h5>
-
-    <div class="row g-2 mb-3">
-      <div class="col-auto">
-        <label for="fromDate" class="form-label">From:</label>
-        <input type="date" id="fromDate" class="form-control form-control-sm">
-      </div>
-      <div class="col-auto">
-        <label for="toDate" class="form-label">To:</label>
-        <input type="date" id="toDate" class="form-control form-control-sm">
-      </div>
-      <div class="col-auto align-self-end">
-        <button id="filterBtn" class="btn btn-primary btn-sm">Filter</button>
-      </div>
-    </div>
-
+ 
+  <div class="row g-2 mb-3 align-items-end">
+  <div class="col-auto">
+    <label class="form-label fw-semibold">From Date</label>
+    <input type="date" id="fromDate" class="form-control form-control-sm">
+  </div>
+ 
+  <div class="col-auto">
+    <label class="form-label fw-semibold">To Date</label>
+    <input type="date" id="toDate" class="form-control form-control-sm">
+  </div>
+ 
+  <div class="col-auto">
+    <button id="filterBtn" class="btn btn-primary btn-sm">
+      Filter
+    </button>
+  </div>
+</div>
+ 
+</div>
+ 
+<!-- No Data Message -->
+<div id="noDataMessage" class="alert alert-info d-none">
+  No attendance records found for the selected date.
+</div>
+ 
+ 
     <div class="table-responsive">
-      <table class="table table-striped table-bordered table-sm" id="txnTable">
-        <thead class="table-light">
-          <tr>
-            <th>#</th>
-            <th>Clock In</th>
-            <th>Clock Out</th>
-            <th>Duration</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
+  <table class="table table-striped table-bordered table-sm" id="txnTable">
+  <thead class="table-light">
+    <tr>
+      <th>Date</th>
+      <th>Clock In</th>
+      <th>Clock Out</th>
+      <th>Total Duration</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+ 
     </div>
-
+ 
     <div class="mt-2 text-end fw-bold">
       Total Hours Worked Today: <span id="totalHoursWorked">00:00:00</span>
     </div>
   </div>
 </div>
-
+ 
 <script>
 document.addEventListener("DOMContentLoaded", () => {
-
+ 
   let workTimerInterval = null;
   let previousWorkedSeconds = 0;
-
+ 
+  // ---------------- Digital Clock ----------------
   function updateDigitalClock() {
     const now = new Date();
     document.getElementById("digitalClock").innerText = now.toLocaleTimeString("en-IN", { hour12: true });
@@ -82,16 +96,25 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   setInterval(updateDigitalClock, 1000);
   updateDigitalClock();
-
+ 
+  // ---------------- Button Status ----------------
   async function setButtonsFromStatus() {
-    const res = await fetch("/attendance/status");
-    const data = await res.json();
-    document.getElementById("clockInBtn").disabled = data.active;
-    document.getElementById("clockOutBtn").disabled = !data.active;
+    try {
+      const res = await fetch("/attendance/status");
+      const data = await res.json();
+      document.getElementById("clockInBtn").disabled = data.active;
+      document.getElementById("clockOutBtn").disabled = !data.active;
+    } catch (err) {
+      console.error("Error fetching status", err);
+    }
   }
-
-  function stopWorkTimer() { clearInterval(workTimerInterval); workTimerInterval=null; }
-
+ 
+  // ---------------- Work Timer ----------------
+  function stopWorkTimer() {
+    clearInterval(workTimerInterval);
+    workTimerInterval = null;
+  }
+ 
   function startWorkTimer(clockInISO) {
     stopWorkTimer();
     const start = new Date(clockInISO);
@@ -105,95 +128,163 @@ document.addEventListener("DOMContentLoaded", () => {
     tick();
     workTimerInterval = setInterval(tick, 1000);
   }
-
+ 
+  // ---------------- Format Helpers ----------------
   function formatHHMMSS(sec) {
     const h = String(Math.floor(sec/3600)).padStart(2,"0");
     const m = String(Math.floor((sec%3600)/60)).padStart(2,"0");
     const s = String(sec%60).padStart(2,"0");
     return `${h}:${m}:${s}`;
   }
-
+ 
   function formatDurationDetail(sec) {
     const h = Math.floor(sec/3600);
     const m = Math.floor((sec%3600)/60);
     const s = sec%60;
     return `${h}h ${m}m ${s}s`;
   }
-
+ 
+  // ---------------- Load Today's Summary ----------------
   async function loadTodaySummary() {
-    const res = await fetch("/attendance/today-summary");
-    const data = await res.json();
-    previousWorkedSeconds = data.total_seconds || 0;
-    document.getElementById("totalWorkedTime").innerText = formatHHMMSS(previousWorkedSeconds);
-
-    const tbody = document.querySelector("#txnTable tbody");
-    tbody.innerHTML = "";
-
-    let totalSeconds = 0;
-    data.transactions.forEach(tx=>{
-      const tr = document.createElement("tr");
-      const durationSec = tx.duration || 0;
-      totalSeconds += durationSec;
-      tr.innerHTML = `
-        <td>${tx.transaction_no}</td>
-        <td>${tx.clock_in}</td>
-        <td>${tx.clock_out}</td>
-        <td>${durationSec ? formatDurationDetail(durationSec) : '-'}</td>
-      `;
-      tbody.appendChild(tr);
-    });
-
-    document.getElementById("totalHoursWorked").innerText = formatHHMMSS(totalSeconds);
+    try {
+      const res = await fetch("/attendance/today-summary");
+      const data = await res.json();
+      previousWorkedSeconds = data.total_seconds || 0;
+      document.getElementById("totalWorkedTime").innerText = formatHHMMSS(previousWorkedSeconds);
+ 
+      const tbody = document.querySelector("#txnTable tbody");
+      tbody.innerHTML = "";
+ 
+      let totalSeconds = 0;
+      data.transactions.forEach(tx => {
+        const durationSec = tx.duration_seconds || 0; // ✅ Use correct backend key
+        totalSeconds += durationSec;
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${tx.transaction_no}</td>
+          <td>${tx.clock_in}</td>
+          <td>${tx.clock_out}</td>
+          <td>${durationSec ? formatDurationDetail(durationSec) : '-'}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+ 
+      document.getElementById("totalHoursWorked").innerText = formatHHMMSS(totalSeconds);
+    } catch (err) {
+      console.error("Error loading today summary", err);
+    }
   }
-
+ 
+  // ---------------- Load Current Session ----------------
   async function loadCurrentSession() {
-    const res = await fetch("/attendance/current");
-    const data = await res.json();
-    if(data.active) startWorkTimer(data.clock_in);
-    else { stopWorkTimer(); document.getElementById("sessionTime").innerText="00:00:00"; }
+    try {
+      const res = await fetch("/attendance/current");
+      const data = await res.json();
+      if(data.active) startWorkTimer(data.clock_in);
+      else { stopWorkTimer(); document.getElementById("sessionTime").innerText="00:00:00"; }
+    } catch (err) {
+      console.error("Error loading current session", err);
+    }
   }
-
-  document.getElementById("clockInBtn").addEventListener("click", async ()=>{
-    const res = await fetch("/attendance/clock_in",{method:"POST"});
-    const data = await res.json();
-    if(!res.ok) return alert(data.error||"Clock In failed");
-    await loadTodaySummary();
-    await loadCurrentSession();
-    await setButtonsFromStatus();
+ 
+  // ---------------- Clock In / Out Buttons ----------------
+  document.getElementById("clockInBtn").addEventListener("click", async () => {
+    const btn = document.getElementById("clockInBtn");
+    btn.disabled = true;
+    try {
+      const res = await fetch("/attendance/clock_in",{method:"POST"});
+      const data = await res.json();
+      if(!res.ok) return alert(data.error || "Clock In failed");
+      await loadTodaySummary();
+      await loadCurrentSession();
+      await setButtonsFromStatus();
+    } catch (err) {
+      alert("Error during Clock In");
+      console.error(err);
+    } finally { btn.disabled = false; }
   });
-
-  document.getElementById("clockOutBtn").addEventListener("click", async ()=>{
+ 
+  document.getElementById("clockOutBtn").addEventListener("click", async () => {
+    const btn = document.getElementById("clockOutBtn");
+    btn.disabled = true;
     stopWorkTimer();
-    const res = await fetch("/attendance/clock_out",{method:"POST"});
-    const data = await res.json();
-    if(!res.ok) return alert(data.error||"Clock Out failed");
+    try {
+      const res = await fetch("/attendance/clock_out",{method:"POST"});
+      const data = await res.json();
+      if(!res.ok) return alert(data.error || "Clock Out failed");
+      await loadTodaySummary();
+      await loadCurrentSession();
+      await setButtonsFromStatus();
+    } catch (err) {
+      alert("Error during Clock Out");
+      console.error(err);
+    } finally { btn.disabled = false; }
+  });
+ 
+  // ---------------- Filter By Date ----------------
+  document.getElementById("filterBtn").addEventListener("click", async () => {
+    const fromDate = document.getElementById("fromDate").value;
+    const toDate = document.getElementById("toDate").value;
+ 
+    const tbody = document.querySelector("#txnTable tbody");
+    const noDataDiv = document.getElementById("noDataMessage");
+ 
+    if (!fromDate || !toDate) {
+      alert("Please select both From and To dates");
+      return;
+    }
+ 
+    try {
+      const res = await fetch(`/admin/attendance/from-to?from=${fromDate}&to=${toDate}`);
+      const data = await res.json();
+ 
+      tbody.innerHTML = "";
+      noDataDiv.classList.add("d-none");
+ 
+      if (!data.days || data.days.length === 0) {
+        noDataDiv.innerHTML = `
+          No attendance records found between
+          <strong>${new Date(fromDate).toLocaleDateString("en-IN")}</strong>
+          and
+          <strong>${new Date(toDate).toLocaleDateString("en-IN")}</strong>.
+        `;
+        noDataDiv.classList.remove("d-none");
+        document.getElementById("totalHoursWorked").innerText = "00:00:00";
+        return;
+      }
+ 
+      let grandTotalSeconds = 0;
+ 
+      data.days.forEach(day => {
+        const durationSec = day.total_seconds || 0;
+        grandTotalSeconds += durationSec;
+ 
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${new Date(day.date).toLocaleDateString("en-IN")}</td>
+          <td>${day.clock_in || "-"}</td>
+          <td>${day.clock_out || "-"}</td>
+          <td>${formatDurationDetail(durationSec)}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+ 
+      document.getElementById("totalHoursWorked").innerText = formatHHMMSS(grandTotalSeconds);
+ 
+    } catch (err) {
+      console.error("Error fetching filtered data", err);
+    }
+  });
+ 
+  // ---------------- INIT ----------------
+  (async function init(){
     await loadTodaySummary();
     await loadCurrentSession();
     await setButtonsFromStatus();
-  });
-
-  document.getElementById("filterBtn").addEventListener("click", async ()=>{
-    const from=document.getElementById("fromDate").value;
-    const to=document.getElementById("toDate").value;
-    if(!from||!to) return alert("Select From & To dates");
-    const res = await fetch(`/attendance/filter?from=${from}&to=${to}`);
-    const data = await res.json();
-    const tbody = document.querySelector("#txnTable tbody");
-    tbody.innerHTML="";
-    data.transactions.forEach(tx=>{
-      const tr = document.createElement("tr");
-      tr.innerHTML=`
-        <td>${tx.transaction_no}</td>
-        <td>${tx.clock_in}</td>
-        <td>${tx.clock_out}</td>
-        <td>${tx.duration===0?'-':formatDurationDetail(tx.duration)}</td>
-      `;
-      tbody.appendChild(tr);
-    });
-  });
-
-  (async function init(){ await loadTodaySummary(); await loadCurrentSession(); await setButtonsFromStatus(); })();
-
+  })();
+ 
 });
 </script>
+ 
 {% endblock %}
+ 
