@@ -196,7 +196,16 @@ def monthly_summary(user_id, year, month):
  
     present_days = len(grouped)
     total_seconds = sum((r.duration_seconds or 0) for r in records)
- 
+    paid_leave_days = db.session.query(
+    func.coalesce(func.sum(Leavee.total_days), 0)
+    ).filter(
+        Leavee.emp_code == Employee.query.filter_by(user_id=user_id).first().emp_code,
+        Leavee.leave_type.in_(["Casual Leave", "Sick Leave"]),
+        Leavee.status == "Approved",
+        extract("month", Leavee.start_date) == month,
+        extract("year", Leavee.start_date) == year
+    ).scalar() or 0
+    absent_days=int(paid_leave_days)
     late_days = early_leave_days = 0
     for recs in grouped.values():
         first_in = min((x.clock_in for x in recs if x.clock_in), default=None)
@@ -207,6 +216,7 @@ def monthly_summary(user_id, year, month):
             late_days += 1
         if last_out and last_out.time() < OFFICE_END:
             early_leave_days += 1
+    
  
     return jsonify({
         "user_id": user_id,
@@ -214,7 +224,7 @@ def monthly_summary(user_id, year, month):
         "month": month,
         "days_in_month": days_in_month,
         "present_days": present_days,
-        "absent_days": days_in_month - present_days,
+        "absent_days": absent_days,
         "total_worked": fmt_seconds(total_seconds),
         "avg_daily": fmt_seconds(int(total_seconds / present_days)) if present_days else "00:00:00",
         "late_days": late_days,
@@ -340,7 +350,7 @@ def download_monthly_attendance_summary_csv():
         ).scalar() or 0
  
         present_days = int(attendance_days + paid_leave_days)
-        absent_days = max(total_working_days - present_days - int(lwp_days), 0)
+        absent_days = int(paid_leave_days)
  
         writer.writerow([
             emp.emp_code,
@@ -417,8 +427,7 @@ def get_monthly_attendance_summary_json():
         ).scalar() or 0
  
         present_days = int(attendance_days + paid_leave_days)
-        absent_days = max(total_working_days - present_days - int(lwp_days), 0)
- 
+        absent_days = int(paid_leave_days)
         data.append({
             "emp_code": emp.emp_code,
             "employee_name": f"{emp.first_name} {emp.last_name}",
