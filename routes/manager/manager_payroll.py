@@ -14,11 +14,11 @@ from io import BytesIO
 import pdfkit
 from routes.employee.employee_routes import current_employee, login_required
 import inflect
-config = pdfkit.configuration(wkhtmltopdf='/usr/bin/wkhtmltopdf')
-employee_payroll_bp = Blueprint(
-    "employee_payroll",
+config = pdfkit.configuration(wkhtmltopdf="/usr/bin/wkhtmltopdf")
+manager_payroll_bp = Blueprint(
+    "manager_payroll",
     __name__,
-    url_prefix="/employee/payroll"
+    url_prefix="/manager/payroll"
 )
 
 # -------------------------------
@@ -50,19 +50,19 @@ def count_holidays(year, month):
 # -------------------------------
 # Payslip page
 # -------------------------------
-@employee_payroll_bp.route("/payslip", methods=["GET"])
+@manager_payroll_bp.route("/payslip", methods=["GET"])
 @login_required
 def payslip_page():
     emp = current_employee()
     if not emp:
         flash("Unauthorized access.", "danger")
         return redirect("/login")
-    return render_template("employee/payslip.html", employee=emp)
+    return render_template("manager/payslip.html", employee=emp)
 
 # -------------------------------
 # Download Payslip
 # -------------------------------
-@employee_payroll_bp.route("/download", methods=["POST"])
+@manager_payroll_bp.route("/download", methods=["POST"])
 @login_required
 def download_payslip():
 
@@ -82,14 +82,14 @@ def download_payslip():
 
     if not payrun:
         flash("Payslip not available yet. Payroll not approved.", "warning")
-        return redirect(url_for("employee_payroll.payslip_page"))
+        return redirect(url_for("manager_payroll.payslip_page"))
 
     salary = EmployeeSalary.query.filter_by(employee_id=emp.id).first()
     account = EmployeeAccount.query.filter_by(employee_id=emp.id).first()
 
     if not salary:
         flash("Salary details not found.", "danger")
-        return redirect(url_for("employee_payroll.payslip_page"))
+        return redirect(url_for("manager_payroll.payslip_page"))
 
     # -------------------------------
     # Working days calculation
@@ -200,7 +200,7 @@ def download_payslip():
     # Render HTML
     # -------------------------------
     rendered_html = render_template(
-        "employee/payslip_pdf.html",
+        "manager/payslip_pdf.html",
         **context
     )
 

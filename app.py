@@ -77,6 +77,7 @@ from routes.settings.settings import settings_bp
 from routes.api_employees import api_emp
 from routes.admin.admin_payroll_routes import admin_payroll_bp
 from routes.employee.employee_payroll import employee_payroll_bp
+from routes.manager.manager_payroll import manager_payroll_bp
 app.register_blueprint(admin_payroll_bp)
 # ----------------- BLUEPRINT REGISTRATION -----------------
 # Auth
@@ -97,7 +98,7 @@ app.register_blueprint(manager_attendance_bp)  # /manager/attendance
       # /manager/leave_management
 app.register_blueprint(manager_team_bp)        # /manager/team
 app.register_blueprint(manager_bp)             # /manager/dashboard, profile, etc.
-
+app.register_blueprint(manager_payroll_bp)
 # Settings
 app.register_blueprint(settings_bp)
 
