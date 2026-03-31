@@ -244,7 +244,7 @@ import pdfkit
 from routes.employee.employee_routes import current_employee, login_required
 import inflect
  
-config = pdfkit.configuration(wkhtmltopdf=r'C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe')
+config = pdfkit.configuration(wkhtmltopdf='/usr/bin/wkhtmltopdf')
 manager_payroll_bp = Blueprint(
     "manager_payroll",
     __name__,

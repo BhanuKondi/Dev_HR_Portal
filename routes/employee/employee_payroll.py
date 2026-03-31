@@ -491,9 +491,7 @@ import inflect
 # -------------------------------
 # PDF Config (Update path if needed)
 # -------------------------------
-config = pdfkit.configuration(
-    wkhtmltopdf=r'C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe'
-)
+config = pdfkit.configuration(wkhtmltopdf='/usr/bin/wkhtmltopdf')
 
 employee_payroll_bp = Blueprint(
     "employee_payroll",
