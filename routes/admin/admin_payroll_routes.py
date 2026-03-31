@@ -352,6 +352,8 @@ def generate_payrun():
  
         # LWP deduction
         lwp_deduction = round(lwp_days * salary_per_day, 2)
+        total_absent_days_deduction=total_working_days-present_days-lwp_days
+        deds=round(total_absent_days_deduction*salary_per_day,2)
  
         # Net salary for the month
         net_salary = round(monthly_salary - lwp_deduction, 2)
@@ -389,7 +391,7 @@ def generate_payrun():
         bonus = payroll.bonus if payroll.bonus else 0
         deduction = payroll.deduction if payroll.deduction else 0
  
-        final_salary = net_salary + bonus - deduction
+        final_salary1 = net_salary + bonus - deduction
  
         # -------------------------------
         # Append Payroll Data
@@ -410,10 +412,10 @@ def generate_payrun():
             "monthly_salary": monthly_salary,
             "salary_per_day": salary_per_day,
             "lwp_deduction": lwp_deduction,
-            "net_salary": net_salary,
+            "net_salary": round(monthly_salary+bonus-deds,2),
             "bonus": bonus,
             "deduction": deduction,
-            "final_salary": final_salary
+            "final_salary": round(monthly_salary+bonus-deds,2)
  
             })
  
@@ -472,33 +474,35 @@ def approve_payrun():
 # ======================================================
 @admin_payroll_bp.route("/update-adjustments", methods=["POST"])
 def update_adjustments():
- 
+
     month = int(request.form.get("month"))
     year = int(request.form.get("year"))
- 
+
     employees = Employee.query.all()
- 
+
     for emp in employees:
- 
+
         bonus = request.form.get(f"bonus_{emp.emp_code}")
         deduction = request.form.get(f"deduction_{emp.emp_code}")
- 
+        comment = request.form.get(f"comments_{emp.emp_code}")  # ✅ NEW
+
         bonus = float(bonus) if bonus else 0
         deduction = float(deduction) if deduction else 0
- 
+
         payroll = PayrollDetails.query.filter_by(
             employee_id=emp.id,
             month=month,
             year=year
         ).first()
- 
+
         if payroll:
             payroll.bonus = bonus
             payroll.deduction = deduction
+            payroll.comments = comment  # 🔥 SAVE COMMENTS
+
             payroll.final_salary = payroll.net_salary + bonus - deduction
- 
+
     db.session.commit()
- 
-    flash("Bonus & Deduction updated successfully!", "success")
+
+    flash("Bonus, Deduction & Comments updated successfully!", "success")
     return "", 200
- 

@@ -191,6 +191,8 @@ class PayrollDetails(db.Model):
     bonus = db.Column(db.Float, default=0)
     deduction = db.Column(db.Float, default=0)
     final_salary = db.Column(db.Float, nullable=False)
+    comments = db.Column(db.String(255), nullable=True)  # ✅ NEW FIELD
+
  
     created_at = db.Column(db.DateTime, server_default=db.func.now())
  

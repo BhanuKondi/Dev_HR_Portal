@@ -254,9 +254,30 @@ manager_payroll_bp = Blueprint(
 # -------------------------------
 # Number to words
 # -------------------------------
+import inflect
+
 def number_to_words(n):
     p = inflect.engine()
-    return p.number_to_words(n, andword="") + " rupees"
+
+    is_negative = n < 0
+    n = abs(n)
+
+    integer_part = int(n)
+    decimal_part = round((n - integer_part) * 100)
+
+    words = p.number_to_words(integer_part, andword="")
+
+    result = ""
+
+    if is_negative:
+        result += "minus "
+
+    result += f"{words} rupees"
+
+    if decimal_part > 0:
+        result += f" and {decimal_part:02d} paise"
+
+    return result
  
 # -------------------------------
 # Count Sundays
@@ -295,43 +316,53 @@ def payslip_page():
 @manager_payroll_bp.route("/download", methods=["POST"])
 @login_required
 def download_payslip():
- 
+
     emp = current_employee()
     if not emp:
         flash("Unauthorized access.", "danger")
         return redirect("/login")
- 
+
     pay_month = request.form.get("pay_month")
+    if not pay_month:
+        flash("Please select a month.", "warning")
+        return redirect(url_for("manager_payroll.payslip_page"))
+
     year, month = map(int, pay_month.split("-"))
- 
+
+    # -------------------------------
+    # Check payroll approval
+    # -------------------------------
     payrun = PayrollRun.query.filter_by(
         month=month,
         year=year,
         approved=True
     ).first()
- 
+
     if not payrun:
         flash("Payslip not available yet. Payroll not approved.", "warning")
-        return redirect(url_for("manager_payroll.payslip_page"))
- 
+        return redirect(url_for("employee_payroll.payslip_page"))
+
+    # -------------------------------
+    # Fetch salary & account
+    # -------------------------------
     salary = EmployeeSalary.query.filter_by(employee_id=emp.id).first()
     account = EmployeeAccount.query.filter_by(employee_id=emp.id).first()
- 
+
     if not salary:
         flash("Salary details not found.", "danger")
-        return redirect(url_for("manager_payroll.payslip_page"))
- 
+        return redirect(url_for("employee_payroll.payslip_page"))
+
     # -------------------------------
     # Working days calculation
     # -------------------------------
     total_days = calendar.monthrange(year, month)[1]
     sundays = count_sundays(year, month)
     holidays = count_holidays(year, month)
- 
+
     total_working_days = total_days - sundays - holidays
- 
+
     # -------------------------------
-    # Attendance (>= 1 hour)
+    # Attendance
     # -------------------------------
     attendance_days = db.session.query(
         func.count(func.distinct(Attendance.date))
@@ -341,9 +372,9 @@ def download_payslip():
         extract("year", Attendance.date) == year,
         Attendance.duration_seconds >= 1
     ).scalar() or 0
- 
+
     # -------------------------------
-    # Paid leaves (CL + SL)
+    # Paid Leaves (CL + SL)
     # -------------------------------
     paid_leave_days = db.session.query(
         func.coalesce(func.sum(Leavee.total_days), 0)
@@ -354,11 +385,11 @@ def download_payslip():
         extract("month", Leavee.start_date) == month,
         extract("year", Leavee.start_date) == year
     ).scalar() or 0
- 
+
     present_days = int(attendance_days + paid_leave_days)
- 
+
     # -------------------------------
-    # LWP (Absent)
+    # LWP (Leave Without Pay)
     # -------------------------------
     lwp_days = db.session.query(
         func.coalesce(func.sum(Leavee.total_days), 0)
@@ -369,40 +400,48 @@ def download_payslip():
         extract("month", Leavee.start_date) == month,
         extract("year", Leavee.start_date) == year
     ).scalar() or 0
- 
+
     lwp_days = int(lwp_days)
+
     # -------------------------------
-# Absent days
-# -------------------------------
+    # Absent Days
+    # -------------------------------
     absent_days = total_working_days - present_days - lwp_days
     if absent_days < 0:
-        absent_days = 0  # just in case
-    absent_and_lwp=absent_days+lwp_days
- 
- 
+        absent_days = 0
+
+    absent_and_lwp = absent_days + lwp_days
+
     # -------------------------------
-    # Salary calculation (based on paid days)
+    # Salary Calculation
     # -------------------------------
     monthly_salary = float(salary.gross_salary) / 12
     salary_per_day = round(monthly_salary / total_working_days, 2)
-    net_salary = round(present_days * salary_per_day, 2)
-    lwp_deduction = round(salary_per_day*lwp_days, 2)
- 
-        # -------------------------------
-    # Fetch Bonus & Deduction
+
+    earned_salary = round(present_days * salary_per_day, 2)
+    lwp_deduction = round(absent_and_lwp * salary_per_day, 2)
+
+    # -------------------------------
+    # Bonus / Deduction / Comment
     # -------------------------------
     payroll = PayrollDetails.query.filter_by(
         employee_id=emp.id,
         month=month,
         year=year
     ).first()
- 
-    bonus = payroll.bonus if payroll else 0
-    deduction = payroll.deduction if payroll else 0
-    final_salary = payroll.final_salary if payroll else net_salary
-    
+
+    bonus = payroll.bonus if payroll and payroll.bonus else 0
+    deduction = payroll.deduction if payroll and payroll.deduction else 0
+    comment = payroll.comments if payroll and payroll.comments else ""
+
+    # Final salary before LWP deduction
+    final_salary = monthly_salary + bonus - deduction-lwp_deduction
+
+    # Net Pay after LWP
+    net_pay = final_salary
+
     # -------------------------------
-    # Earnings breakdown
+    # Earnings Breakdown
     # -------------------------------
     earnings = [
         ("Basic", salary.basic_percent),
@@ -412,7 +451,7 @@ def download_payslip():
         ("Driver Reimbursement", salary.driver_reimbursement),
         ("EPF", salary.epf_percent)
     ]
- 
+
     # -------------------------------
     # Context for PDF
     # -------------------------------
@@ -426,31 +465,38 @@ def download_payslip():
         "pay_period": f"{calendar.month_name[month]} {year}",
         "pay_date": payrun.approved_at.strftime("%d-%m-%Y"),
         "bank_account": account.account_number if account else "-",
+
         "total_working_days": total_working_days,
         "paid_days": present_days,
         "lop_days": lwp_days,
+        "absent_days": absent_days,
+
         "earnings": earnings,
-        "gross_salary": monthly_salary+bonus,
+
+        "gross_salary": monthly_salary,
+        "earned_salary": earned_salary,
         "lwp_deduction": lwp_deduction,
-        "net_pay": final_salary-lwp_deduction,
+
         "bonus": bonus,
         "deduction": deduction,
-        "final_salary": final_salary,
-       "amount_in_words": number_to_words(final_salary),
-        "basic": round((salary.basic_percent / 100) * monthly_salary, 2),
-        "hra": round((salary.hra_percent / 100) * monthly_salary, 2),
-        "fixed_allowance":round((salary.fixed_allowance / 100) * monthly_salary, 2),
-        "absent_days":absent_days
+        "comment": comment,
+
+        "net_pay": net_pay,
+        "amount_in_words": number_to_words(net_pay),
+
+        "basic": round((salary.basic_percent * 100) / 12, 2),
+        "hra": round((salary.hra_percent * 100) / 12, 2),
+        "fixed_allowance": round((salary.fixed_allowance * 100) / 12, 2),
     }
- 
+
     # -------------------------------
     # Render HTML
     # -------------------------------
     rendered_html = render_template(
-        "manager/payslip_pdf.html",
+        "employee/payslip_pdf.html",
         **context
     )
- 
+
     # -------------------------------
     # Generate PDF
     # -------------------------------
@@ -459,14 +505,17 @@ def download_payslip():
         "encoding": "UTF-8",
         "enable-local-file-access": None
     }
- 
-    pdf_bytes = pdfkit.from_string(rendered_html,False,options=pdf_options,configuration=config)
- 
+
+    pdf_bytes = pdfkit.from_string(
+        rendered_html,
+        False,
+        options=pdf_options,
+        configuration=config
+    )
+
     return send_file(
         BytesIO(pdf_bytes),
         as_attachment=True,
         download_name=f"Payslip_{emp.emp_code}_{month}_{year}.pdf",
         mimetype="application/pdf"
     )
- 
- 

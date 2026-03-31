@@ -201,3 +201,12 @@ def add_holiday():
         return redirect(url_for("admin_leaves.leave_management"))
 
     return render_template("admin/add_holiday.html")
+# ---------------- DELETE HOLIDAY ----------------
+@admin_lbp.route("/delete-holiday/<int:holiday_id>", methods=["POST"])
+def delete_holiday(holiday_id):
+    holiday = Holiday.query.get_or_404(holiday_id)
+
+    db.session.delete(holiday)
+    db.session.commit()
+
+    return jsonify({"success": True})

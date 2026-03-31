@@ -47,6 +47,7 @@
               <th>Clock In</th>
               <th>Clock Out</th>
               <th>Total Worked</th>
+              <th>Live Clock</th>
               <th>Status</th>
               <th>View</th>
             </tr>
@@ -219,6 +220,7 @@ function createCell(text) {
   td.innerText = text ?? '-';
   return td;
 }
+ 
 function formatHHMM(timeStr) {
   if (!timeStr) return "00:00";
   return timeStr.split(":").slice(0, 2).join(":");
@@ -237,6 +239,8 @@ function sumDurations(transactions) {
   const mm = Math.floor(totalMinutes % 60);
   return `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;
 }    
+ 
+ 
 /* LOAD TODAY TABLE */
 async function loadToday() {
   try {
@@ -251,6 +255,15 @@ async function loadToday() {
       tr.appendChild(createCell(row.clock_in));
       tr.appendChild(createCell(row.clock_out));
       tr.appendChild(createCell(formatHHMM(row.worked)));
+ 
+      // ✅ LIVE CLOCK COLUMN
+      const liveTd = document.createElement('td');
+      liveTd.setAttribute("data-clockin", row.clock_in);
+      liveTd.setAttribute("data-status", row.status);
+      liveTd.setAttribute("data-worked", row.worked);
+      liveTd.innerText = "00:00";
+      tr.appendChild(liveTd);
+ 
       tr.appendChild(createCell(row.status));
       const btnTd = document.createElement('td');
       const btn = document.createElement('button');
@@ -393,7 +406,7 @@ document.getElementById('showDateBtn')?.addEventListener('click', async () => {
     data.forEach(row => {
       const tr = document.createElement('tr');
       tr.appendChild(createCell(row.name));
-       tr.appendChild(createCell(formatHHMM(row.worked)));
+      tr.appendChild(createCell(formatHHMM(row.worked)));
       tbody.appendChild(tr);
     });
  
@@ -407,12 +420,80 @@ document.getElementById('showDateBtn')?.addEventListener('click', async () => {
   }
 });
  
+function convertTo24Hour(timeStr) {
+  if (!timeStr) return null;
+ 
+  const parts = timeStr.split(" ");
+  if (parts.length < 2) return null;
+ 
+  const time = parts[0];
+  const modifier = parts[1];
+ 
+  let [hours, minutes, seconds] = time.split(":").map(Number);
+ 
+  if (modifier === "PM" && hours !== 12) hours += 12;
+  if (modifier === "AM" && hours === 12) hours = 0;
+ 
+  return `${String(hours).padStart(2,'0')}:${minutes}:${seconds}`;
+}
+ 
+function updateLiveClocks() {
+  const rows = document.querySelectorAll("#todayTable tbody tr");
+ 
+  rows.forEach(row => {
+    const liveTd = row.children[4]; // Live clock column position
+    const clockIn = liveTd.getAttribute("data-clockin");
+    const status = liveTd.getAttribute("data-status");
+ 
+      if (!clockIn || clockIn === "-") {
+      liveTd.innerText = "00:00:00";
+      return;
+    }
+ 
+    if (status.toLowerCase() !== "active") {
+      const worked = liveTd.getAttribute("data-worked");
+      liveTd.innerText = worked ? worked : "00:00:00";
+      return;
+    }
+    const now = new Date();
+    const today = now.toISOString().split("T")[0];
+ 
+    const convertedTime = convertTo24Hour(clockIn);
+ 
+      if (!convertedTime) {
+        liveTd.innerText = "--:--";
+        return;
+      }
+ 
+      const startTime = new Date(`${today}T${convertedTime}`);
+    const diffMs = now - startTime;
+ 
+    if (diffMs < 0) {
+      liveTd.innerText = "00:00";
+      return;
+    }
+ 
+   const totalSeconds = Math.floor(diffMs / 1000);
+ 
+    const hh = Math.floor(totalSeconds / 3600);
+    const mm = Math.floor((totalSeconds % 3600) / 60);
+    const ss = totalSeconds % 60;
+ 
+    liveTd.innerText =
+      String(hh).padStart(2, '0') + ":" +
+      String(mm).padStart(2, '0') + ":" +
+      String(ss).padStart(2, '0');
+  });
+}
+ 
 /* INIT */
 startClock();
 loadToday();
 setInterval(loadToday, 30000);
+setInterval(updateLiveClocks, 1000);  
 </script>
  
 {% endblock %}
+ 
  
  

@@ -574,10 +574,29 @@ def current_employee():
 def get_user_email(user_id):
     user = User.query.filter_by(id=user_id).first()
     return user.email if user else None
-
+import calendar
+from datetime import datetime
 
 def get_total_cl_for_year():
-    return (datetime.now().month - 1) * 0.5
+    CL_START_MONTH = 3  # March
+
+    today = datetime.now()
+    current_month = today.month
+    current_day = today.day
+
+    if current_month < CL_START_MONTH:
+        return 0
+
+    # Get last day of current month
+    last_day = calendar.monthrange(today.year, current_month)[1]
+
+    # If month NOT completed → don't count this month
+    if current_day < last_day:
+        months_completed = current_month - CL_START_MONTH
+    else:
+        months_completed = current_month - CL_START_MONTH + 1
+
+    return months_completed * 0.5
 
 
 def get_consumed_leaves(emp_code, leave_type):
@@ -754,13 +773,28 @@ def submit_leave():
         l1_email = get_user_email(level1_id)
         if l1_email:
             send_email(
-                "New Leave Request - Approval Needed",
-                [l1_email],
-                f"""Employee: {emp.first_name}
-Leave: {leave_type}
-From: {start}
-To: {end}
-Days: {total_days}"""
+                
+    "New Leave Request - Action Required",
+    [l1_email],
+    f"""
+Hello,
+
+A new leave request has been submitted and requires your approval.
+
+Employee Name : {emp.first_name} {emp.last_name}
+Leave Type    : {leave_type}
+From Date     : {start}
+To Date       : {end}
+Total Days    : {total_days}
+Reason        : {request.form['reason']}
+
+Please open the below link to review the request.
+http://74.249.73.140:5050/manager/leaves/leave-management
+
+Regards,  
+HR System
+"""
+
             )
     except Exception as e:
         print("Email error:", e)
@@ -845,19 +879,82 @@ def approve_leave(leave_id):
     if leave.current_approver_id != emp.user_id:
         return jsonify({"error": "Not authorized"}), 403
 
+    # ============================
+    # L1 APPROVAL → SEND TO L2
+    # ============================
     if leave.status == "PENDING_L1":
         leave.status = "PENDING_L2"
         leave.level1_decision_date = datetime.now()
         leave.current_approver_id = leave.level2_approver_id
 
+        # ✅ SEND EMAIL TO L2
+        try:
+            l2_email = get_user_email(leave.level2_approver_id)
+            if l2_email:
+                send_email(
+    "Leave Request Pending - Level 2 Approval",
+    [l2_email],
+    f"""
+Hello,
+
+A leave request has been approved by Level 1 and is now pending your approval.
+
+Employee Name : {leave.employee_name}
+Leave Type    : {leave.leave_type}
+From Date     : {leave.start_date}
+To Date       : {leave.end_date}
+Total Days    : {leave.total_days}
+Reason        : {leave.reason}
+
+Kindly open below link to review and take appropriate action.
+http://74.249.73.140:5050/manager/leaves/leave-management
+Regards,  
+HR System
+"""
+)
+        except Exception as e:
+            print("Email error (L2):", e)
+
+    # ============================
+    # L2 APPROVAL → FINAL APPROVED
+    # ============================
     elif leave.status == "PENDING_L2":
         leave.status = "APPROVED"
         leave.level2_decision_date = datetime.now()
         leave.current_approver_id = None
 
+        # ✅ SEND EMAIL TO EMPLOYEE
+        try:
+            emp_record = Employee.query.filter_by(emp_code=leave.emp_code).first()
+            emp_email = get_user_email(emp_record.user_id)
+
+            if emp_email:
+                send_email(
+    "Leave Approved",
+    [emp_email],
+    f"""
+Hello,
+
+Your leave request has been approved successfully.
+
+Leave Details:
+---------------
+Leave Type : {leave.leave_type}
+From       : {leave.start_date}
+To         : {leave.end_date}
+Days       : {leave.total_days}
+
+Enjoy your time off 😊
+
+Regards,  
+HR Team
+"""
+)
+        except Exception as e:
+            print("Email error (Approval):", e)
+
     db.session.commit()
     return jsonify({"success": True})
-
 
 # ==========================================
 # REJECT
@@ -882,9 +979,38 @@ def reject_leave(leave_id):
     leave.current_approver_id = None
     db.session.commit()
 
+    # ✅ SEND EMAIL TO EMPLOYEE
+    try:
+        emp_record = Employee.query.filter_by(emp_code=leave.emp_code).first()
+        emp_email = get_user_email(emp_record.user_id)
+
+        if emp_email:
+            send_email(
+    "Leave Request Rejected",
+    [emp_email],
+    f"""
+Hello,
+
+We regret to inform you that your leave request has been rejected.
+
+Leave Details:
+---------------
+Leave Type : {leave.leave_type}
+From       : {leave.start_date}
+To         : {leave.end_date}
+Days       : {leave.total_days}
+Status     : {leave.status}
+
+For more details, please contact your manager.
+
+Regards,  
+HR Team
+"""
+)
+    except Exception as e:
+        print("Email error (Reject):", e)
+
     return jsonify({"success": True})
-
-
 # ==========================================
 # LEAVE BALANCE
 # ==========================================

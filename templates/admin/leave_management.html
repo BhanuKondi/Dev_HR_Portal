@@ -27,25 +27,32 @@
 
         <table class="table table-striped mt-3">
             <thead>
-                <tr>
-                    <th>S.No</th>
-                    <th>Holiday</th>
-                    <th>Date</th>
-                </tr>
-            </thead>
-            <tbody id="holidays-table-body">
-                {% for h in holidays %}
-                <tr>
-                    <td>{{ loop.index }}</td>
-                    <td>{{ h.occasion }}</td>
-                    <td>{{ h.date }}</td>
-                </tr>
-                {% else %}
-                <tr>
-                    <td colspan="3" class="text-center text-muted">No holidays added</td>
-                </tr>
-                {% endfor %}
-            </tbody>
+    <tr>
+        <th>S.No</th>
+        <th>Holiday</th>
+        <th>Date</th>
+        <th>Action</th> <!-- NEW -->
+    </tr>
+</thead>
+<tbody id="holidays-table-body">
+    {% for h in holidays %}
+    <tr>
+        <td>{{ loop.index }}</td>
+        <td>{{ h.occasion }}</td>
+        <td>{{ h.date }}</td>
+        <td>
+            <button class="btn btn-danger btn-sm"
+                onclick="deleteHoliday({{ h.id }})">
+                Delete
+            </button>
+        </td>
+    </tr>
+    {% else %}
+    <tr>
+        <td colspan="4" class="text-center text-muted">No holidays added</td>
+    </tr>
+    {% endfor %}
+</tbody>
         </table>
     </div>
 
@@ -212,7 +219,19 @@ function loadSummary() {
             document.getElementById("summary-body").innerHTML = html;
         });
 }
+function deleteHoliday(id) {
+    if (!confirm("Are you sure you want to delete this holiday?")) return;
 
+    fetch(`/admin/leaves/delete-holiday/${id}`, {
+        method: "POST"
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            location.reload(); // simple refresh
+        }
+    });
+}
 
 // Show Holidays tab by default
 window.onload = () => showTab('holidays');
