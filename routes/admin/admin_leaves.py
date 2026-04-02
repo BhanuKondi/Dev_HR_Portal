@@ -208,5 +208,5 @@ def delete_holiday(holiday_id):
 
     db.session.delete(holiday)
     db.session.commit()
-
+    
     return jsonify({"success": True})
