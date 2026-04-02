@@ -1,8 +1,8 @@
-from flask import Blueprint, render_template, session, redirect, jsonify, request
-from models.models import Employee
+from flask import Blueprint, jsonify, redirect, render_template, request
 from models.attendance import Attendance, IST
 from models.db import db
-from datetime import datetime, date, timedelta
+from datetime import datetime, timedelta
+from utils.authz import ROLE_MANAGER, get_current_employee, require_roles
  
 # ================= SHIFT CONFIG =================
 SHIFT_START_HOUR = 7  # 7 AM
@@ -14,15 +14,17 @@ manager_attendance_bp = Blueprint(
     __name__,
     url_prefix="/manager/attendance"
 )
+
+
+@manager_attendance_bp.before_request
+def enforce_manager_role():
+    return require_roles(ROLE_MANAGER)
  
 # --------------------------------------------------
 # Helper: fetch logged-in manager
 # --------------------------------------------------
 def current_manager():
-    user_id = session.get("user_id")
-    if not user_id:
-        return None
-    return Employee.query.filter_by(user_id=user_id).first()
+    return get_current_employee()
  
 # --------------------------------------------------
 # Helper: shift date (7 AM → 7 AM)
@@ -57,7 +59,7 @@ def auto_clock_out_after_shift(user_id):
 def attendance_page():
     mgr = current_manager()
     if not mgr:
-        return redirect("/login")
+        return redirect("/logout")
     auto_clock_out_after_shift(mgr.user_id)
     return render_template("manager/attendance.html", manager=mgr)
  

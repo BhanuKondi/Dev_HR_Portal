@@ -1,27 +1,35 @@
-from flask import Blueprint, request, jsonify
+import hmac
+import os
+
+from flask import Blueprint, current_app, jsonify, request
 from models.models import Employee, User
 from models.db import db
 from functools import wraps
+from utils.authz import ROLE_USER, get_role_id
 
 api_emp = Blueprint("api_emp", __name__, url_prefix="/api")
 
-# =============================
-#  SIMPLE BASIC AUTH (HARDCODED)
-# =============================
-
-API_USERNAME = "sailpoint"
-API_PASSWORD = "HrApp@123"
+def get_api_credentials():
+    username = os.getenv("HR_API_USERNAME", current_app.config.get("HR_API_USERNAME"))
+    password = os.getenv("HR_API_PASSWORD", current_app.config.get("HR_API_PASSWORD"))
+    return username, password
 
 
 def basic_auth_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         auth = request.authorization
+        expected_username, expected_password = get_api_credentials()
 
         if not auth:
             return jsonify({"error": "Authentication required"}), 401
 
-        if auth.username != API_USERNAME or auth.password != API_PASSWORD:
+        if not expected_username or not expected_password:
+            return jsonify({"error": "API credentials are not configured"}), 503
+
+        username_ok = hmac.compare_digest(auth.username or "", expected_username)
+        password_ok = hmac.compare_digest(auth.password or "", expected_password)
+        if not username_ok or not password_ok:
             return jsonify({"error": "Invalid credentials"}), 401
 
         return f(*args, **kwargs)
@@ -94,9 +102,7 @@ def api_get_employee(empCode):
 @api_emp.route("/employee", methods=["POST"])
 @basic_auth_required
 def api_create_employee():
-    
-
-    data = request.json
+    data = request.get_json(silent=True) or {}
 
     required_fields = [
         "firstName", "lastName", "email",
@@ -124,11 +130,15 @@ def api_create_employee():
     if User.query.filter_by(email=data["email"]).first():
         return jsonify({"error": "Email already exists"}), 400
 
+    employee_role_id = get_role_id(ROLE_USER)
+    if not employee_role_id:
+        return jsonify({"error": "Employee role is not configured"}), 500
+
     # Create user account
     user = User(
         email=data["email"],
         display_name=f"{data['firstName']} {data['lastName']}",
-        role_id=3,
+        role_id=employee_role_id,
         is_active=True
     )
     user.set_password("Temp@123")

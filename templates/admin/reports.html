@@ -1,92 +1,142 @@
 {% extends "admin/admin_base.html" %}
 {% block content %}
- 
-<div class="container mt-4">
-    <h3 class="fw-bold mb-3">Attendance Reports</h3>
- 
-    <!-- FILTER -->
-    <div class="card shadow-sm mb-4">
-        <div class="card-body">
-            <form method="GET"
-                  action="{{ url_for('admin_attendance_bp.download_monthly_attendance_summary_csv') }}">
-                <div class="row g-3 align-items-end">
- 
-                    <div class="col-md-4">
-                        <label class="form-label">Select Month</label>
-                        <input type="month" id="monthInput" name="month" class="form-control" required>
-                    </div>
- 
-                    <div class="col-md-4">
-                        <button type="submit" class="btn btn-primary w-100">
-                            Download Monthly Attendance (CSV)
-                        </button>
-                    </div>
- 
-                </div>
-            </form>
-        </div>
-    </div>
- 
-    <!-- TABLE -->
-    <div class="card shadow-sm">
-        <div class="card-body">
-            <h5 class="fw-semibold mb-3">Monthly Attendance Summary</h5>
- 
-            <div class="table-responsive">
-                <table class="table table-bordered table-striped table-hover align-middle">
-                    <thead class="table-dark">
-                        <tr>
-                            <th>Emp Code</th>
-                            <th>Employee Name</th>
-                            <th>Total Working Days</th>
-                            <th>Present</th>
-                            <th>Absent</th>
-                            <th>LWP</th>
-                        </tr>
-                    </thead>
-                    <tbody id="attendanceTableBody">
-                        <tr>
-                            <td colspan="6" class="text-center text-muted">
-                                Select a month to load data
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
+
+<div class="workspace-hero">
+    <div class="data-toolbar">
+        <div>
+            <p class="eyebrow mb-2">Attendance Analytics</p>
+            <h3 class="fw-bold mb-1">Attendance Reports</h3>
+            <p class="text-muted mb-0">Review monthly attendance summary data and export CSV reports for payroll or audit workflows.</p>
         </div>
     </div>
 </div>
- 
+
+<div class="section-card mb-4">
+    <div class="data-toolbar">
+        <div>
+            <h5 class="mb-1">Monthly Export</h5>
+            <p class="text-muted mb-0">Choose a month to download a CSV summary of employee attendance.</p>
+        </div>
+    </div>
+
+    <form method="GET" action="{{ url_for('admin_attendance_bp.download_monthly_attendance_summary_csv') }}">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label">Select Month</label>
+                <input type="month" id="monthInput" name="month" class="form-control" required>
+            </div>
+            <div class="col-md-4">
+                <button type="submit" class="btn btn-primary w-100">Download Monthly Attendance (CSV)</button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<div class="section-card">
+    <div class="data-toolbar">
+        <div>
+            <h5 class="mb-1">Monthly Attendance Summary</h5>
+            <p class="text-muted mb-0">Preview summary numbers before exporting the report.</p>
+        </div>
+    </div>
+
+    <div class="analytics-grid">
+        <div class="analytics-card">
+            <span>Employees</span>
+            <strong id="reportEmployeeCount">0</strong>
+            <p>Included in the selected month.</p>
+        </div>
+        <div class="analytics-card">
+            <span>Attendance Rate</span>
+            <strong id="reportAttendanceRate">0%</strong>
+            <p>Average present days against working days.</p>
+        </div>
+        <div class="analytics-card">
+            <span>Total Absences</span>
+            <strong id="reportAbsences">0</strong>
+            <p>Aggregated absences across the team.</p>
+        </div>
+        <div class="analytics-card">
+            <span>Total LWP</span>
+            <strong id="reportLwp">0</strong>
+            <p>Leave without pay days this month.</p>
+        </div>
+    </div>
+
+    <div class="report-note mb-3" id="reportInsight">
+        Select a month to load attendance analytics and preview export-ready data.
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-bordered table-striped table-hover align-middle">
+            <thead>
+                <tr>
+                    <th>Emp Code</th>
+                    <th>Employee Name</th>
+                    <th>Total Working Days</th>
+                    <th>Present</th>
+                    <th>Absent</th>
+                    <th>LWP</th>
+                </tr>
+            </thead>
+            <tbody id="attendanceTableBody">
+                <tr>
+                    <td colspan="6" class="text-center text-muted">Select a month to load data</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
 <script>
 const monthInput = document.getElementById("monthInput");
 const tableBody = document.getElementById("attendanceTableBody");
- 
+
 monthInput.addEventListener("change", function () {
     const month = this.value;
     if (!month) return;
- 
-    tableBody.innerHTML = `
-        <tr>
-            <td colspan="6" class="text-center">Loading...</td>
-        </tr>
-    `;
- 
+
+    tableBody.innerHTML = `<tr><td colspan="6" class="text-center">Loading...</td></tr>`;
+
     fetch(`{{ url_for('admin_attendance_bp.get_monthly_attendance_summary_json') }}?month=${month}`)
         .then(res => res.json())
         .then(data => {
             tableBody.innerHTML = "";
- 
+            const employeeCountNode = document.getElementById("reportEmployeeCount");
+            const rateNode = document.getElementById("reportAttendanceRate");
+            const absencesNode = document.getElementById("reportAbsences");
+            const lwpNode = document.getElementById("reportLwp");
+            const insightNode = document.getElementById("reportInsight");
+
             if (data.length === 0) {
-                tableBody.innerHTML = `
-                    <tr>
-                        <td colspan="6" class="text-center text-muted">
-                            No data found
-                        </td>
-                    </tr>
-                `;
+                tableBody.innerHTML = `<tr><td colspan="6" class="text-center text-muted">No data found</td></tr>`;
+                employeeCountNode.innerText = "0";
+                rateNode.innerText = "0%";
+                absencesNode.innerText = "0";
+                lwpNode.innerText = "0";
+                insightNode.innerText = "No attendance data was found for the selected month.";
                 return;
             }
- 
+
+            const totals = data.reduce((acc, row) => {
+                acc.employees += 1;
+                acc.workingDays += Number(row.total_working_days || 0);
+                acc.present += Number(row.present_days || 0);
+                acc.absent += Number(row.absent_days || 0);
+                acc.lwp += Number(row.lwp_days || 0);
+                return acc;
+            }, { employees: 0, workingDays: 0, present: 0, absent: 0, lwp: 0 });
+
+            const attendanceRate = totals.workingDays
+                ? Math.round((totals.present / totals.workingDays) * 100)
+                : 0;
+
+            employeeCountNode.innerText = String(totals.employees);
+            rateNode.innerText = `${attendanceRate}%`;
+            absencesNode.innerText = String(totals.absent);
+            lwpNode.innerText = String(totals.lwp);
+            insightNode.innerText = `${totals.present} present days recorded across ${totals.employees} employees for the selected month.`;
+
             data.forEach(row => {
                 tableBody.innerHTML += `
                     <tr>
@@ -101,15 +151,10 @@ monthInput.addEventListener("change", function () {
             });
         })
         .catch(() => {
-            tableBody.innerHTML = `
-                <tr>
-                    <td colspan="6" class="text-center text-danger">
-                        Failed to load data
-                    </td>
-                </tr>
-            `;
+            tableBody.innerHTML = `<tr><td colspan="6" class="text-center text-danger">Failed to load data</td></tr>`;
+            document.getElementById("reportInsight").innerText = "Attendance analytics could not be loaded for the selected month.";
         });
 });
 </script>
- 
+
 {% endblock %}

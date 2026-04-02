@@ -18,6 +18,7 @@ class User(db.Model):
     email = db.Column(VARCHAR(255), unique=True, nullable=False)
     password_hash = db.Column(VARCHAR(255), nullable=False)
     display_name = db.Column(VARCHAR(255))
+    profile_photo_path = db.Column(VARCHAR(255), nullable=True)
 
     role_id = db.Column(INTEGER, db.ForeignKey("roles.id"), nullable=False)
     role = db.relationship("Role")

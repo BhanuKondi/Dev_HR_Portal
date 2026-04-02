@@ -27,6 +27,10 @@ admin_attendance_bp = Blueprint(
 )
  
 IST = ZoneInfo("Asia/Kolkata")
+
+
+def get_shift_date(now_dt):
+    return Attendance.get_shift_date(now_dt)
  
  
 @admin_attendance_bp.route("/reports")
@@ -55,7 +59,7 @@ def attendance_page():
 # -------------------------------
 @admin_attendance_bp.route("/list_today")
 def list_today():
-    today = datetime.now(IST).date()
+    today = get_shift_date(datetime.now(IST))
     users = User.query.order_by(User.display_name).all()
     result = []
  
@@ -103,7 +107,7 @@ def list_today():
 @admin_attendance_bp.route("/transactions/<int:user_id>")
 def attendance_transactions(user_id):
     date_str = request.args.get("date")
-    the_date = datetime.fromisoformat(date_str).date() if date_str else datetime.now(IST).date()
+    the_date = datetime.fromisoformat(date_str).date() if date_str else get_shift_date(datetime.now(IST))
  
     records = Attendance.query.filter_by(user_id=user_id, date=the_date).order_by(Attendance.clock_in).all()
  
@@ -124,9 +128,9 @@ def list_history():
     q = request.args
     try:
         start_date = datetime.fromisoformat(q.get("start_date")).date() \
-            if q.get("start_date") else datetime.now(IST).date() - timedelta(days=30)
+            if q.get("start_date") else get_shift_date(datetime.now(IST)) - timedelta(days=30)
         end_date = datetime.fromisoformat(q.get("end_date")).date() \
-            if q.get("end_date") else datetime.now(IST).date()
+            if q.get("end_date") else get_shift_date(datetime.now(IST))
     except Exception:
         return jsonify({"error": "Invalid date format"}), 400
  
