@@ -102,13 +102,15 @@ def leave_summary():
     today = datetime.now()
     current_year = today.year
     current_month = today.month
-
+    
     # Financial year starts in March
-    if current_month >= 3:
-        months_passed = current_month - 2   # March = 1
+    if current_month > 3:
+        months_passed = current_month - 3   # Completed months
+    elif current_month == 3:
+        months_passed = 1   # End of March → 1 month completed
     else:
-        months_passed = current_month + 10  # Jan=11, Feb=12
-
+        months_passed = current_month + 9   # Jan=10, Feb=11
+    
     TOTAL_CL = round(months_passed * 0.5, 2)
     TOTAL_SL = 6
 
@@ -206,5 +208,5 @@ def delete_holiday(holiday_id):
 
     db.session.delete(holiday)
     db.session.commit()
-
+    
     return jsonify({"success": True})
